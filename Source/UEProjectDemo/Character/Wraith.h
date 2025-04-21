@@ -112,7 +112,7 @@ protected:
 	
 	FVector3d RopeLocation;
 
-	UPROPERTY(EditAnywhere, Category = "Cable")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cable")
 	UCableComponent* CableComponent;
 
 	void ImpulseTension();
@@ -125,6 +125,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
 	FVector CurrentAcceleration;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
+	TObjectPtr<class UAnimMontage> RopeMontage;
 
 	// ÇÃ·¡±×
 

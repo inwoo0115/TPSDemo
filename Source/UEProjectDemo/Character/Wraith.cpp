@@ -46,7 +46,26 @@ AWraith::AWraith()
 	}
 
 	//케이블 설정
-	CableComponent = nullptr;
+	CableComponent = CreateDefaultSubobject<UCableComponent>(TEXT("CableComponent"));
+	CableComponent->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("Muzzle_03"));
+	CableComponent->SolverIterations = 16;
+	CableComponent->bEnableStiffness = true;
+	CableComponent->CableLength = 10;
+	CableComponent->EndLocation = FVector(0.0f, 0.0f, 0.0f);
+	CableComponent->SetVisibility(true);
+	CableComponent->CableWidth = 3.5f;
+	static ConstructorHelpers::FObjectFinder<UMaterial> CableMaterial(TEXT("/Game/UtopianCity/Materials/M_HoloMatPainting01.M_HoloMatPainting01"));
+	if (CableMaterial.Object)
+	{
+		CableComponent->SetMaterial(0, CableMaterial.Object);
+	}
+
+	//케이블 부착 AnimMontage 설정
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> RopeMontageRef(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_Q_Fire_Montage.Ability_Q_Fire_Montage"));
+	if (RopeMontageRef.Object)
+	{
+		RopeMontage = RopeMontageRef.Object;
+	}
 
 	//Camera, Spring Arm 설정
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -139,11 +158,11 @@ void AWraith::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 타임라인 초기화
+	// Aim 타임라인
 	FloatCurve = NewObject<UCurveFloat>(this, UCurveFloat::StaticClass());
 	FRichCurve* RichCurve = &FloatCurve->FloatCurve;
 	RichCurve->AddKey(0.0f, 300.0f);
-	RichCurve->AddKey(0.2f, 40.0f);
+	RichCurve->AddKey(0.1f, 40.0f);
 	InterpFunction.BindUFunction(this, FName("AimUpdate"));
 	AimTimeline.AddInterpFloat(FloatCurve, InterpFunction);
 	AimTimeline.SetLooping(false);
@@ -220,10 +239,7 @@ void AWraith::Run(const FInputActionValue& Value)
 	}
 }
 
-void AWraith::Attack(const FInputActionValue& Value)
-{
-	
-}
+
 
 void AWraith::AimIn(const FInputActionValue& Value)
 {
@@ -256,8 +272,7 @@ void AWraith::Rope(const FInputActionValue& Value)
 		// 케이블 제거
 		if (CableComponent)
 		{
-			CableComponent->DestroyComponent();
-			CableComponent = nullptr;
+			CableComponent->UnregisterComponent();
 		}
 	}
 	else
@@ -283,16 +298,9 @@ void AWraith::Rope(const FInputActionValue& Value)
 				IsGrappling = true;
 				RopeLocation = RopeHolder->GetActorLocation();
 				// 물체와 플레이어 잇는 케이블 설치 
-				// TODO: 나중에 이거 미리 만드는걸로 바꿔야하나...?
-				CableComponent = NewObject<UCableComponent>(this, UCableComponent::StaticClass());
 				CableComponent->RegisterComponent();
-				CableComponent->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("Muzzle_03"));
 				CableComponent->SetAttachEndTo(RopeHolder, TEXT("SphereMesh"));
-				CableComponent->SolverIterations = 16;
-				CableComponent->bEnableStiffness = true;
-				CableComponent->CableLength = 10;
-				CableComponent->EndLocation = FVector(0.0f, 0.0f, 0.0f);
-				CableComponent->SetVisibility(true);
+				PlayAnimMontage(RopeMontage);
 			}
 		}
 	}
@@ -334,7 +342,7 @@ void AWraith::ImpulseTension()
 				TotalForceScalar += DotGravity;
 			}
 
-			// 추가 가속도 보정
+			// 캐릭터 질량 적용
 			TotalForceScalar *= -1.0 * GetCharacterMovement()->Mass;
 
 			// 특정 거리 이상일 경우 탄성력 적용
@@ -348,38 +356,6 @@ void AWraith::ImpulseTension()
 			GetCharacterMovement()->AddForce(AddForce);
 		}
 	}
-}
-
-
-void AWraith::Throw(const FInputActionValue& Value)
-{
-	// Anim Montage 실행
-	if (IsThrow)
-	{
-		static ConstructorHelpers::FObjectFinder<UAnimMontage> ThrowMontage(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_E_Montage.Ability_E_Montage"));
-		if (ThrowMontage.Object)
-		{
-			PlayAnimMontage(ThrowMontage.Object, 1.0f);
-		}
-
-		//2초 쿨타임 적용
-		IsThrow = false;
-		GetWorld()->GetTimerManager().SetTimer(
-			DelayTimeHandle,
-			[this]()
-			{
-				IsThrow = true;
-			},
-			2.0f,
-			false
-		);
-		
-	}
-	// TODO : 수류탄 액터 스폰 추가
-}
-
-void AWraith::Reload(const FInputActionValue& Value)
-{
 }
 
 void AWraith::Landed(const FHitResult& Hit)
@@ -398,4 +374,19 @@ void AWraith::Landed(const FHitResult& Hit)
 		0.5f,
 		false
 		);
+}
+
+
+void AWraith::Throw(const FInputActionValue& Value)
+{
+	// TODO : 수류탄 액터 스폰 추가
+}
+
+void AWraith::Attack(const FInputActionValue& Value)
+{
+
+}
+
+void AWraith::Reload(const FInputActionValue& Value)
+{
 }

@@ -33,7 +33,7 @@ void UTPSAnimInstance::NativeUpdateAnimation(float DeltaSceonds)
 		bIsAim = Owner->GetIsAim();
 		bIsAccelerating = Movement->GetCurrentAcceleration().Length() > 0;
 		Axis = Owner->GetActorTransform().InverseTransformVector(Owner->GetVelocity().GetSafeNormal(0.0001));
-
+		bIsMontagePlaying = Montage_IsPlaying(nullptr);
 		if (Owner->GetController())
 		{
 			FRotator ControlRotation = Owner->GetController()->GetControlRotation();

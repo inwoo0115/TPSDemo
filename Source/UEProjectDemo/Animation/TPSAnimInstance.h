@@ -51,5 +51,8 @@ public:
 	uint8 bIsAim;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
+	uint8 bIsMontagePlaying;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
 	FVector Axis;
 };
