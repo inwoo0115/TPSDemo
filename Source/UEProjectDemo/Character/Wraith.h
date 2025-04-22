@@ -6,7 +6,7 @@
 #include "Character/TPSCharacterBase.h"
 #include "InputActionValue.h"
 #include "Components/TimelineComponent.h"
-#include "CableComponent.h"
+#include "CharacterComponent/RopeComponent.h"
 #include "InputMappingContext.h"
 #include "Wraith.generated.h"
 
@@ -32,7 +32,6 @@ public:
 protected:
 	
 	// 입력 액션
-
 	void Move(const FInputActionValue& Value);
 
 	void Look(const FInputActionValue& Value);
@@ -85,59 +84,43 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UInputAction> ReloadAction;
 
+	//매핑 컨택스트
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = InputContext, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UInputMappingContext> InputMappingContext;
 
 	// 컴포넌트
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UCameraComponent> Camera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class USpringArmComponent> SpringArm;
 
-	// 에임 타임라인
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cable")
+	URopeComponent* RopeComponent;
 
+
+	// 에임 타임라인
 	FTimeline AimTimeline;
 
 	UFUNCTION()
 	void AimUpdate(float Alpha);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Timeline)
-	UCurveFloat* FloatCurve;
+	UCurveFloat* FloatCurve = nullptr;
 
 	FOnTimelineFloat InterpFunction{};
 
-	// 로프 액션
-	
-	FVector3d RopeLocation;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cable")
-	UCableComponent* CableComponent;
-
-	void ImpulseTension();
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
-	FVector LastVelocity;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
-	FVector CurrentVelocity;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
-	FVector CurrentAcceleration;
-
+	// 애니메이션 몽타주 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope")
 	TObjectPtr<class UAnimMontage> RopeMontage;
 
-	// 플래그
 
+	// 플래그
 	bool IsRun = false;
 
 	bool IsAttack = false;
 
 	bool IsJump = true;
-
-	bool IsGrappling = false;
 
 	bool IsThrow = true;
 

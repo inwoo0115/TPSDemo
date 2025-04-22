@@ -7,11 +7,11 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Camera/CameraComponent.h"
-#include "CableComponent.h"
 #include "EnhancedInputComponent.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
 #include "Props/RopeHolder.h"
+#include "CharacterComponent/RopeComponent.h"
 
 // 캐릭터 기본 설정
 AWraith::AWraith()
@@ -43,28 +43,6 @@ AWraith::AWraith()
 	if (CharacterAnim.Class)
 	{
 		GetMesh()->SetAnimClass(CharacterAnim.Class);
-	}
-
-	//케이블 설정
-	CableComponent = CreateDefaultSubobject<UCableComponent>(TEXT("CableComponent"));
-	CableComponent->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("Muzzle_03"));
-	CableComponent->SolverIterations = 16;
-	CableComponent->bEnableStiffness = true;
-	CableComponent->CableLength = 10;
-	CableComponent->EndLocation = FVector(0.0f, 0.0f, 0.0f);
-	CableComponent->SetVisibility(true);
-	CableComponent->CableWidth = 3.5f;
-	static ConstructorHelpers::FObjectFinder<UMaterial> CableMaterial(TEXT("/Game/UtopianCity/Materials/M_HoloMatPainting01.M_HoloMatPainting01"));
-	if (CableMaterial.Object)
-	{
-		CableComponent->SetMaterial(0, CableMaterial.Object);
-	}
-
-	//케이블 부착 AnimMontage 설정
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> RopeMontageRef(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_Q_Fire_Montage.Ability_Q_Fire_Montage"));
-	if (RopeMontageRef.Object)
-	{
-		RopeMontage = RopeMontageRef.Object;
 	}
 
 	//Camera, Spring Arm 설정
@@ -133,6 +111,16 @@ AWraith::AWraith()
 
 	// 캐릭터 Physic 설정
 	GetCharacterMovement()->Mass = 500;
+
+	//케이블 설정
+	RopeComponent = CreateDefaultSubobject<URopeComponent>(TEXT("RopeComponent"));
+
+	//케이블 부착 AnimMontage 설정
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> RopeMontageRef(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_Q_Fire_Montage.Ability_Q_Fire_Montage"));
+	if (RopeMontageRef.Object)
+	{
+		RopeMontage = RopeMontageRef.Object;
+	}
 }
 
 void AWraith::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -169,7 +157,6 @@ void AWraith::BeginPlay()
 	AimTimeline.SetPlayRate(1.0f);
 
 	//Input system mapping
-
 	APlayerController* PlayerController = CastChecked<APlayerController>(GetController());
 	if (auto SubSystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 	{
@@ -183,12 +170,6 @@ void AWraith::Tick(float DeltaTime)
 
 	// 타임라인 tick 갱신
 	AimTimeline.TickTimeline(DeltaTime);
-
-	// 줄에 매달려 있을 경우 힘 적용
-	CurrentVelocity = GetCharacterMovement()->Velocity;
-	CurrentAcceleration = (CurrentVelocity - LastVelocity) / DeltaTime;
-	LastVelocity = CurrentVelocity;
-	ImpulseTension();
 }
 
 void AWraith::Move(const FInputActionValue& Value)
@@ -239,8 +220,6 @@ void AWraith::Run(const FInputActionValue& Value)
 	}
 }
 
-
-
 void AWraith::AimIn(const FInputActionValue& Value)
 {
 	if (FloatCurve)
@@ -266,14 +245,10 @@ void AWraith::AimUpdate(float Alpha)
 
 void AWraith::Rope(const FInputActionValue& Value)
 {
-	if (IsGrappling)
+	if (RopeComponent->GetIsGrappling())
 	{
-		IsGrappling = false;
-		// 케이블 제거
-		if (CableComponent)
-		{
-			CableComponent->UnregisterComponent();
-		}
+		RopeComponent->SetIsGrappling(false);
+		RopeComponent->UnregisterComponent();
 	}
 	else
 	{
@@ -295,65 +270,13 @@ void AWraith::Rope(const FInputActionValue& Value)
 			ARopeHolder* RopeHolder = Cast<ARopeHolder>(HitResult.GetActor());
 			if (RopeHolder)
 			{
-				IsGrappling = true;
-				RopeLocation = RopeHolder->GetActorLocation();
+				RopeComponent->SetIsGrappling(true);
+				RopeComponent->SetRopeLocation(RopeHolder->GetActorLocation());
 				// 물체와 플레이어 잇는 케이블 설치 
-				CableComponent->RegisterComponent();
-				CableComponent->SetAttachEndTo(RopeHolder, TEXT("SphereMesh"));
+				RopeComponent->RegisterComponent();
+				RopeComponent->SetAttachEndTo(RopeHolder, TEXT("SphereMesh"));
 				PlayAnimMontage(RopeMontage);
 			}
-		}
-	}
-}
-
-
-// 장력 탄성력 적용
-void AWraith::ImpulseTension()
-{
-	if (IsGrappling)
-	{
-		// 장력 + 탄성력
-		FVector3d AddForce;
-
-		//매달려 있는 물체와 액터 간의 방향벡터
-		FVector3d RopeDirectionVector = RopeLocation - GetMesh()->GetSocketLocation(TEXT("head"));
-		double RopeLength = RopeDirectionVector.Length();
-
-		//특정 거리 이상일 때만 적용
-		if (RopeLength > 200.0)
-		{
-			RopeDirectionVector.Normalize();
-			//중력 벡터
-			FVector3d GravityVector = FVector3d(0.0f, 0.0f, GetCharacterMovement()->GetGravityZ());
-			//내적
-			double DotAcceleration = RopeDirectionVector | CurrentAcceleration; //가속도
-			double DotGravity = RopeDirectionVector | GravityVector;
-
-
-			double TotalForceScalar = 0.0;
-			double ElasticForceScalar = 0.0;
-			// 내적 값이 양수 일 경우에 더하기
-			if (DotAcceleration < 0.0)
-			{
-				TotalForceScalar += DotAcceleration;
-			}
-			if (DotGravity < 0.0)
-			{
-				TotalForceScalar += DotGravity;
-			}
-
-			// 캐릭터 질량 적용
-			TotalForceScalar *= -1.0 * GetCharacterMovement()->Mass;
-
-			// 특정 거리 이상일 경우 탄성력 적용
-			if (RopeLength > 500.0)
-			{
-				ElasticForceScalar = RopeLength * 500.0;
-			}
-
-			// 장력 + 탄성력 적용
-			AddForce = (TotalForceScalar + ElasticForceScalar) * RopeDirectionVector;
-			GetCharacterMovement()->AddForce(AddForce);
 		}
 	}
 }
@@ -379,12 +302,10 @@ void AWraith::Landed(const FHitResult& Hit)
 
 void AWraith::Throw(const FInputActionValue& Value)
 {
-	// TODO : 수류탄 액터 스폰 추가
 }
 
 void AWraith::Attack(const FInputActionValue& Value)
 {
-
 }
 
 void AWraith::Reload(const FInputActionValue& Value)
