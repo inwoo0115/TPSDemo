@@ -23,19 +23,23 @@ public:
 	
 	virtual void OnRegister() override;
 
+	virtual void BeginPlay() override;
+
+	// Setter
 	UFUNCTION(BlueprintCallable, Category = "RopeComponent")
-	void SetRopeLocation(const FVector& NewLocation);
+	FORCEINLINE void SetRopeLocation(const FVector& NewLocation);
 
 
 	UFUNCTION(BlueprintCallable, Category = "RopeComponent")
 	void SetIsGrappling(const bool NewIsGrappling);
 
+	// Getter
 	UFUNCTION(BlueprintCallable, Category = "RopeComponent")
-	bool GetIsGrappling();
+	FORCEINLINE bool GetIsGrappling();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Character")
-	TObjectPtr<class AWraith> Owner;
+	TObjectPtr<class ACharacter> Owner;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Character")
 	TObjectPtr<class UCharacterMovementComponent> Movement;

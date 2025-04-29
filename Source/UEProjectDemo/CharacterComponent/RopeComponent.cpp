@@ -1,13 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Character/Wraith.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "CharacterComponent/RopeComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 URopeComponent::URopeComponent()
 {
 	// 캐릭터, 캐릭터 무브먼트 설정
-	Owner = Cast<AWraith>(GetOwner());
+	Owner = Cast<ACharacter>(GetOwner());
 	if (Owner)
 	{
 		Movement = Owner->GetCharacterMovement();
@@ -27,7 +27,7 @@ URopeComponent::URopeComponent()
 	CableLength = 10;
 	EndLocation = FVector(0.0f, 0.0f, 0.0f);
 	SetVisibility(true);
-	CableWidth = 3.5f;
+	CableWidth = 3.0f;
 }
 
 void URopeComponent::OnRegister()
@@ -35,6 +35,13 @@ void URopeComponent::OnRegister()
 	Super::OnRegister();
 	//케이블 부착
 	AttachToComponent(Owner->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("Muzzle_03"));
+}
+
+void URopeComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	//시작 시 비활성화
+	UnregisterComponent();
 }
 
 void URopeComponent::UpdateTension()
@@ -70,9 +77,9 @@ void URopeComponent::UpdateTension()
 		TotalForceScalar *= -1.0 * Movement->Mass;
 
 		// 특정 거리 이상일 경우 탄성력 적용
-		if (RopeLength > 500.0)
+		if (RopeLength > 100.0)
 		{
-			ElasticForceScalar = RopeLength * 500.0;
+			ElasticForceScalar = RopeLength * 80.0;
 		}
 
 		// 장력 + 탄성력 적용

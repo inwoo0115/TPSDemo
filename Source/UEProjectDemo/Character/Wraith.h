@@ -6,7 +6,6 @@
 #include "Character/TPSCharacterBase.h"
 #include "InputActionValue.h"
 #include "Components/TimelineComponent.h"
-#include "CharacterComponent/RopeComponent.h"
 #include "InputMappingContext.h"
 #include "Wraith.generated.h"
 
@@ -34,9 +33,11 @@ protected:
 	// 입력 액션
 	void Move(const FInputActionValue& Value);
 
+	void MoveComplete(const FInputActionValue& Value);
+
 	void Look(const FInputActionValue& Value);
 
-	void Jump(const FInputActionValue& Value);
+	void Jump();
 
 	void Run(const FInputActionValue& Value);
 
@@ -96,7 +97,7 @@ protected:
 	TObjectPtr<class USpringArmComponent> SpringArm;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cable")
-	URopeComponent* RopeComponent;
+	TObjectPtr<class URopeComponent> RopeComponent;
 
 
 	// 에임 타임라인
@@ -128,4 +129,7 @@ protected:
 
 	// 타이머
 	FTimerHandle DelayTimeHandle;
+
+	// 최근 이동 입력
+	FVector LastInputDirection = FVector(0.0f, 0.0f, 0.0f);
 };

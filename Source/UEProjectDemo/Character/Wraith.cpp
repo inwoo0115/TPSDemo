@@ -3,7 +3,6 @@
 
 #include "Character/Wraith.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Components/CapsuleComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Camera/CameraComponent.h"
@@ -16,21 +15,6 @@
 // 캐릭터 기본 설정
 AWraith::AWraith()
 {
-	//컨트롤러의 회전을 받아서 설정하는 모드
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationRoll = false;
-	bUseControllerRotationYaw = true;
-
-	//무브먼트 설정
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 360.0f, 0.0f);
-	GetCharacterMovement()->JumpZVelocity = 600.0f;
-
-	//캡슐 컴포넌트 설정
-	GetCapsuleComponent()->SetCapsuleHalfHeight(88.0f);
-
-	//Mesh 위치 설정
-	GetMesh()->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -88.0f), FRotator(0.0f, -90.0f, 0.0f));
-
 	//리소스 설정
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> CharacterMesh(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Meshes/Wraith.Wraith"));
 	if (CharacterMesh.Object)
@@ -44,7 +28,6 @@ AWraith::AWraith()
 	{
 		GetMesh()->SetAnimClass(CharacterAnim.Class);
 	}
-
 	//Camera, Spring Arm 설정
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArm->SetupAttachment(RootComponent);
@@ -54,6 +37,16 @@ AWraith::AWraith()
 	
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
+
+	//케이블 설정
+	RopeComponent = CreateDefaultSubobject<URopeComponent>(TEXT("RopeComponent"));
+
+	//케이블 부착 AnimMontage 설정
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> RopeMontageRef(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_Q_Fire_Montage.Ability_Q_Fire_Montage"));
+	if (RopeMontageRef.Object)
+	{
+		RopeMontage = RopeMontageRef.Object;
+	}
 
 	//Input 설정
 	static ConstructorHelpers::FObjectFinder<UInputAction> JumpActionRef(TEXT("/Game/Demo/Input/Actions/IA_Jump.IA_Jump"));
@@ -108,19 +101,6 @@ AWraith::AWraith()
 	{
 		InputMappingContext = IMCRef.Object;
 	}
-
-	// 캐릭터 Physic 설정
-	GetCharacterMovement()->Mass = 500;
-
-	//케이블 설정
-	RopeComponent = CreateDefaultSubobject<URopeComponent>(TEXT("RopeComponent"));
-
-	//케이블 부착 AnimMontage 설정
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> RopeMontageRef(TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Ability_Q_Fire_Montage.Ability_Q_Fire_Montage"));
-	if (RopeMontageRef.Object)
-	{
-		RopeMontage = RopeMontageRef.Object;
-	}
 }
 
 void AWraith::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -132,6 +112,7 @@ void AWraith::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	// Binding
 	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AWraith::Jump);
 	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AWraith::Move);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AWraith::MoveComplete);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AWraith::Look);
 	EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &AWraith::Run);
 	EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AWraith::Attack);
@@ -187,6 +168,15 @@ void AWraith::Move(const FInputActionValue& Value)
 	// 무브먼트 컴포넌트에 값 전달.
 	AddMovementInput(ForwardVector, Movement.X);
 	AddMovementInput(RightVector, Movement.Y);
+
+	// 방향 저장
+	LastInputDirection = FVector(Movement.Y, Movement.X, 0.0f);
+}
+
+void AWraith::MoveComplete(const FInputActionValue& Value)
+{
+	// 방향키 입력이 없을 경우 초기화
+	LastInputDirection = FVector::ZeroVector;
 }
 
 void AWraith::Look(const FInputActionValue& Value)
@@ -198,11 +188,30 @@ void AWraith::Look(const FInputActionValue& Value)
 	AddControllerYawInput(Movement.X);
 }
 
-void AWraith::Jump(const FInputActionValue& Value)
+void AWraith::Jump()
 {
-	if (IsJump)
+	if (IsJump && !RopeComponent->GetIsGrappling())
 	{
-		Super::Jump();
+		int32 CurrentJumpCount = JumpCurrentCount;
+		//이단 점프 시 추진력 추가
+		//TODO: 이펙트 추가
+		if (CurrentJumpCount == 1)
+		{
+			// 컨트롤러 회전 값
+			FRotator Rotation = GetControlRotation();
+			FRotator YawRotation(0.0f, Rotation.Yaw, 0.0f);
+
+			// 방향 구하기.
+			FVector ForwardVector = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+			FVector RightVector = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);			
+			GetCharacterMovement()->AddImpulse(ForwardVector * LastInputDirection.Y * 100000);
+			GetCharacterMovement()->AddImpulse(RightVector * LastInputDirection.X * 100000);
+			JumpCurrentCount += 1;
+		}
+		else
+		{
+			Super::Jump();
+		}
 	}
 }
 
@@ -270,11 +279,13 @@ void AWraith::Rope(const FInputActionValue& Value)
 			ARopeHolder* RopeHolder = Cast<ARopeHolder>(HitResult.GetActor());
 			if (RopeHolder)
 			{
+				// RopeComponent 설정
 				RopeComponent->SetIsGrappling(true);
 				RopeComponent->SetRopeLocation(RopeHolder->GetActorLocation());
-				// 물체와 플레이어 잇는 케이블 설치 
+				// 물체와 플레이어 잇는 케이블 활성화
 				RopeComponent->RegisterComponent();
 				RopeComponent->SetAttachEndTo(RopeHolder, TEXT("SphereMesh"));
+				// 로프 액션 몽타주 재생
 				PlayAnimMontage(RopeMontage);
 			}
 		}
@@ -286,15 +297,14 @@ void AWraith::Landed(const FHitResult& Hit)
 	Super::Landed(Hit);
 
 	IsJump = false;
-
-	// 바닥 착지 후 0.5초 후 점프 가능
+	// 바닥 착지 후 타이머 진행 이후 점프 가능
 	GetWorld()->GetTimerManager().SetTimer(
 		DelayTimeHandle,
 		[this]()
 		{
 			IsJump = true;
 		},
-		0.5f,
+		0.4f,
 		false
 		);
 }
